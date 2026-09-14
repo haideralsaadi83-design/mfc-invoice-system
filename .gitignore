@@ -1,0 +1,14 @@
+# Understand-Anything knowledge graph / session tooling
+.ua/
+.remember/
+
+# Editor / OS noise
+New Text Document.txt
+Thumbs.db
+.DS_Store
+*.bak
+
+# Local Firebase credentials (never commit)
+firebase-config.local.js
+.env
+.env.local
