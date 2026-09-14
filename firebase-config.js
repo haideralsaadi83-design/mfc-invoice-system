@@ -29,10 +29,6 @@ window.FIREBASE_CONFIG = {
   appId: '1:1087245727585:web:9d853f9606ae7fb14c7720',
 };
 
-window.ALLOWED_EMAILS = [
-  'haider.alsaadi83@gmail.com',
-];
-
 /* Shown in the UI so a rejected user gets a useful message instead of a raw
    permission error. The real enforcement is in firestore.rules — editing this
    list alone grants nobody access. Leave empty to skip the client-side hint. */
