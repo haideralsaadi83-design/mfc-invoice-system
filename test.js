@@ -86,19 +86,34 @@ function build(netTotal) {
   return t.state().invoices[0];
 }
 
-// Net BELOW target -> override: VAT 0%, VAT amount pinned to the target.
-const below = build(300000);
-check('net below target overrides', below.targetOverridden, true);
+// The rule compares Net x VAT% against the target, so at 30% the break-even
+// net is TARGET/0.30 = 1315050.
+
+// Net x 30% BELOW target -> override: VAT 0%, VAT amount pinned to the target.
+// 500000 x 30% = 150000, short of 394515 -- note the NET alone clears the
+// target here, so this also pins down that it is the VAT that is compared.
+const below = build(500000);
+check('VAT below target overrides', below.targetOverridden, true);
 check('overridden invoice reports 0%', below.vatPercent, 0);
 check('overridden VAT equals the target', Math.round(below.totalVat), TARGET);
 check('overridden line also reports 0%', below.lineItems[0].vatPercent, 0);
+check('overridden invoice keeps the requested rate', below.vatPercentRequested, 30);
 
-// Net ABOVE target -> normal VAT.
-const above = build(500000);
-check('net above target does not override', above.targetOverridden, false);
+// Net x 30% ABOVE target -> normal VAT.
+const above = build(2000000);
+check('VAT above target does not override', above.targetOverridden, false);
 check('normal invoice keeps 30%', above.vatPercent, 30);
-check('normal VAT is 30% of net', Math.round(above.totalVat), 150000);
-check('gross is net plus VAT', Math.round(above.totalGross), 650000);
+check('normal VAT is 30% of net', Math.round(above.totalVat), 600000);
+check('gross is net plus VAT', Math.round(above.totalGross), 2600000);
+
+// VAT % is typed in by hand, so 0 is the likely slip: at 0% the calculated VAT
+// is 0 and can never reach a target, forcing every targeted invoice.
+els.vatPercent.value = '0';
+const noVat = build(2000000);
+check('0% VAT forces the override', noVat.targetOverridden, true);
+check('0% VAT pins VAT to the target', Math.round(noVat.totalVat), TARGET);
+check('0% VAT records 0 as requested', noVat.vatPercentRequested, 0);
+els.vatPercent.value = '30';
 
 /* ---------------- 2. Step 4 filtering and sorting ----------------------- */
 

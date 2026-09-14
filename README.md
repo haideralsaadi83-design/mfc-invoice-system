@@ -43,23 +43,26 @@ Calculated VAT = Net Amount × (VAT% / 100)
 Gross Amount = Net Amount + Calculated VAT
 ```
 
-VAT defaults to **30%** and applies to every invoice. Changing it in Step 3 recalculates the whole preview immediately.
+VAT starts at **0** and is entered by hand in Step 3 for each run. Changing it recalculates the whole preview immediately.
 
 ### The target-amount override
 
-If a PO carries a target `Invoice Amount` in Step 2, that target is compared against the invoice's Net Amount:
+If a PO carries a target `Invoice Amount` in Step 2, that target is compared against the invoice's **Calculated VAT Amount** (Net Amount × the Step 3 VAT %):
 
-- **Net covers the target** → VAT % applies normally.
-- **Net falls short of the target** (usually because the open quantity is too low) → that invoice's **VAT % is forced to 0**, and its **Calculated VAT Amount is forced to the exact target**, split across the line items proportionally to their net amounts. The remainder from rounding lands on the last line so the parts always sum back to the target exactly.
+- **Calculated VAT covers the target** → VAT % applies normally.
+- **Calculated VAT falls short of the target** → that invoice's **VAT % is forced to 0**, and its **Calculated VAT Amount is forced to the exact target**, split across the line items proportionally to their net amounts. The remainder from rounding lands on the last line so the parts always sum back to the target exactly.
 
-Worked example, target `394,515` at 30% VAT:
+Because the comparison is against Net × VAT %, leaving VAT at 0 means the calculated VAT is always 0 and can never reach a target — every targeted invoice would be forced. Step 3 flags that case explicitly rather than reporting it as a quantity shortfall.
 
-| | Net = 300,000 (below target) | Net = 500,000 (above target) |
+Worked example, target `394,515` at 30% VAT (break-even net is `394,515 / 0.30` = `1,315,050`):
+
+| | Net = 500,000 (VAT below target) | Net = 2,000,000 (VAT above target) |
 |---|---|---|
+| Calculated VAT at 30% | 150,000 — short | 600,000 — covers |
 | Overridden | **yes** | no |
 | VAT % | **0** | 30 |
-| VAT amount | **394,515** | 150,000 |
-| Gross | 694,515 | 650,000 |
+| VAT amount | **394,515** | 600,000 |
+| Gross | 894,515 | 2,600,000 |
 
 Overridden invoices are flagged in the preview with a badge and a warning banner listing every affected PO.
 

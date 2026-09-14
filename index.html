@@ -413,7 +413,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
     <section class="section" id="sec2">
       <div class="card">
         <h3>🔗 Import Invoice Reference Table <span class="badge neutral" id="mapBadge">Not imported yet</span></h3>
-        <p class="hint">Paste or upload the table with columns: <code class="inline">Site</code> · <code class="inline">PO#</code> · <code class="inline">Invoice Number</code> · <code class="inline">Invoice Amount</code> (optional). <b>Only the PO's listed in this table will be built into invoices</b> — any PO from Step 1 that is not listed here will be skipped. If you add an <code class="inline">Invoice Amount</code> column, that invoice's Net Amount is checked against it: if the Net Amount already covers it, VAT % (Step 3) is applied normally; if it doesn't (the available quantity is too low), VAT % is set to 0% and Calculated VAT Amount is forced to that exact target amount instead.</p>
+        <p class="hint">Paste or upload the table with columns: <code class="inline">Site</code> · <code class="inline">PO#</code> · <code class="inline">Invoice Number</code> · <code class="inline">Invoice Amount</code> (optional). <b>Only the PO's listed in this table will be built into invoices</b> — any PO from Step 1 that is not listed here will be skipped. If you add an <code class="inline">Invoice Amount</code> column, that invoice's Calculated VAT Amount (Net × VAT% from Step 3) is checked against it: if it already covers the target, VAT % is applied normally; if it doesn't, VAT % is set to 0% and Calculated VAT Amount is forced to that exact target amount instead.</p>
         <textarea id="mapText" placeholder="Site&#9;PO#&#9;Invoice Number&#9;Invoice Amount&#10;448&#9;51337869&#9;INV2026-0269&#9;IQD 394,515 ..."></textarea>
         <div class="dropzone-row">
           <input type="file" id="mapFile" accept=".xlsx,.xls,.csv,.tsv,.txt">
@@ -443,7 +443,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
         <div class="field-row">
           <div class="field vat-field">
             <label>VAT % (applied to all invoices instantly)</label>
-            <div class="suffix"><input type="number" id="vatPercent" value="30" min="0" max="100" step="0.01"></div>
+            <div class="suffix"><input type="number" id="vatPercent" value="0" min="0" max="100" step="0.01"></div>
           </div>
           <div class="field">
             <label>Bank Account (fixed)</label>
@@ -462,7 +462,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
           <b>Note:</b>
           VAT Amount always stays zero (the tax is applied only through the VAT % field). Changing VAT % instantly recalculates Calculated VAT Amount and Gross Amount for every line item in the preview — Gross Amount = Net Amount × (1 + VAT% / 100).
           <br><br>
-          <b>Target amount check (Step 2):</b> if an invoice has a target <code class="inline">Invoice Amount</code> from Step 2, its Net Amount is checked against that target first. If Net Amount already covers it, VAT % (above) is applied normally. If Net Amount falls short — usually because the available quantity is too low — that invoice's VAT % is forced to 0% and its Calculated VAT Amount is set to the exact target amount instead, so it can still be matched manually in the export.
+          <b>Target amount check (Step 2):</b> if an invoice has a target <code class="inline">Invoice Amount</code> from Step 2, its Calculated VAT Amount (Net × this VAT %) is checked against that target first. If it already covers the target, VAT % is applied normally. If it falls short, that invoice's VAT % is forced to 0% and its Calculated VAT Amount is set to the exact target amount instead, so it can still be matched manually in the export.
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;">
