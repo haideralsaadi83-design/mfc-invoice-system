@@ -8,6 +8,12 @@
      even behind restrictive corporate firewalls or with limited internet. -->
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/exceljs.min.js"></script>
+<!-- Firebase is loaded from Google's CDN rather than vendored: cloud sync
+     needs the network anyway, so a local copy would buy nothing. If these
+     fail to load the app still runs fully — cloud sync just stays off. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 /* ============ Design tokens ============ */
 :root{
@@ -43,6 +49,25 @@ body{
   min-height:100vh;
 }
 ::selection{background:var(--cyan);color:white;}
+
+/* ---- Cloud sync / ledger ---- */
+.cloud-box{display:flex;align-items:center;gap:8px;}
+.cloud-pill{
+  font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:999px;
+  background:var(--ice);color:var(--slate);white-space:nowrap;
+  border:1px solid var(--ice-2);
+}
+.cloud-pill.on{background:var(--good-bg);color:var(--good);border-color:transparent;}
+.cloud-pill.warn{background:var(--gold-bg);color:var(--gold-text);border-color:transparent;}
+.cloud-pill.err{background:var(--bad-bg);color:var(--bad);border-color:transparent;}
+.ledger-row{
+  display:flex;justify-content:space-between;align-items:center;gap:14px;
+  padding:11px 14px;border:1px solid var(--ice-2);border-radius:var(--radius);
+  margin-bottom:7px;background:var(--white);flex-wrap:wrap;
+}
+.ledger-row .ref{font-weight:700;color:var(--blue);}
+.ledger-row .meta{font-size:11.5px;color:var(--slate);}
+.ledger-row .amt{font-family:var(--font-mono);font-size:13px;}
 
 /* ============ Layout shell ============ */
 .app{
@@ -311,6 +336,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
       <div class="step" data-step="4"><span class="num">4</span> Preview Invoices</div>
       <div class="step" data-step="5"><span class="num">5</span> Export Excel</div>
       <div class="step" data-step="6"><span class="num">6</span> Saved Sessions</div>
+      <div class="step" data-step="7"><span class="num">7</span> Team Ledger</div>
     </div>
 
     <div class="sidebar-footer">
@@ -330,6 +356,10 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
       <div class="session-controls">
         <button class="btn-secondary" id="btnAutoRestoreInfo" title="Restore last working session">↺ Restore Last Session</button>
         <button class="btn-primary" id="btnSaveSessionTop">💾 Save Session Now</button>
+        <div class="cloud-box">
+          <span class="cloud-pill" id="cloudPill" title="Cloud sync status">☁ Offline</span>
+          <button class="btn-secondary" id="btnCloudAuth" style="display:none;">Sign in</button>
+        </div>
       </div>
     </div>
 
@@ -456,6 +486,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
         </div>
         <div class="dropzone-row">
           <button class="btn-gold" id="btnExportExcel">⬇ Download Excel File</button>
+          <button class="btn-primary" id="btnPushCloud">☁ Save Invoices to Team Ledger</button>
         </div>
         <div id="exportMsg" style="margin-top:12px;"></div>
       </div>
@@ -490,11 +521,47 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
       </div>
     </section>
 
+    <!-- STEP 7 -->
+    <section class="section" id="sec7">
+      <div class="card">
+        <h3>☁ Team Ledger <span class="badge neutral" id="ledgerBadge">Not connected</span></h3>
+        <p class="hint">Every invoice your team saves to the cloud appears here, live — no refresh needed. Records are keyed by invoice number, so saving the same batch twice updates those invoices instead of duplicating them.</p>
+        <div id="cloudSetup" class="warn-list" style="display:none;"></div>
+        <div class="field-row" id="ledgerControls" style="display:none;">
+          <div class="field" style="flex:1;min-width:240px;">
+            <label>Filter</label>
+            <input type="text" id="ledgerFilter" placeholder="Invoice number, PO, supplier or person…">
+          </div>
+          <div class="field">
+            <label>Show</label>
+            <select id="ledgerScope">
+              <option value="all">All invoices</option>
+              <option value="mine">Only mine</option>
+              <option value="overridden">Only VAT-overridden</option>
+            </select>
+          </div>
+        </div>
+        <div class="stat-grid" id="ledgerStats" style="display:none;margin-top:16px;">
+          <div class="stat"><div class="n" id="ldCount">0</div><div class="l">Invoices recorded</div></div>
+          <div class="stat"><div class="n" id="ldGross">0</div><div class="l">Total Gross</div></div>
+          <div class="stat"><div class="n" id="ldPeople">0</div><div class="l">Contributors</div></div>
+          <div class="stat"><div class="n" id="ldOverride">0</div><div class="l">VAT-overridden</div></div>
+        </div>
+        <div id="ledgerList" style="margin-top:18px;"></div>
+        <div class="empty-state" id="emptyLedger" style="display:none;">
+          <div class="icon">☁</div>
+          Nothing saved to the ledger yet.
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<script src="firebase-config.js"></script>
+<script src="cloud.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,58 @@
+rules_version = '2';
+
+/* =========================================================================
+   Firestore security rules for the MFC Invoice System.
+
+   Paste this into: Firebase console > Firestore Database > Rules > Publish.
+
+   ADD YOUR TEAM'S EMAIL ADDRESSES to the allowlist below. Nobody else can
+   read or write a single invoice, even though the project ID is public in
+   the GitHub repo. That is the point: the project ID is not a secret, this
+   file is what actually protects the data.
+   ========================================================================= */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- EDIT THIS LIST ----------------------------------------------
+    function allowlist() {
+      return [
+        'haider.alsaadi83@gmail.com',
+        // 'teammate@yourcompany.com',
+      ];
+    }
+    // ------------------------------------------------------------------
+
+    function isTeamMember() {
+      return request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email in allowlist();
+    }
+
+    // Every invoice the team has recorded. Document ID is the invoice
+    // reference, so re-uploading the same batch updates in place instead
+    // of creating duplicates.
+    match /invoices/{invoiceRef} {
+      allow read: if isTeamMember();
+
+      // On create/update, pin the author to the signed-in user so a client
+      // cannot write someone else's name onto a record.
+      allow create, update: if isTeamMember()
+                            && request.resource.data.createdBy == request.auth.token.email;
+
+      // Deleting an invoice record is deliberately not allowed from the app.
+      // Remove it from the Firebase console if you genuinely need to.
+      allow delete: if false;
+    }
+
+    // Batch metadata: one document per export run, for grouping/auditing.
+    match /batches/{batchId} {
+      allow read: if isTeamMember();
+      allow create, update: if isTeamMember()
+                            && request.resource.data.createdBy == request.auth.token.email;
+      allow delete: if false;
+    }
+
+    // Anything not matched above is denied by default.
+  }
+}

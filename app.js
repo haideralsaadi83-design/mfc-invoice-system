@@ -940,6 +940,7 @@ function goStep(n){
     4:['Invoice Preview','Review each invoice before exporting — totals update instantly when VAT % changes'],
     5:['Export Excel','Download a Multi-Upload file ready to import into AP eConnect'],
     6:['Saved Sessions','Save your current work or reopen a previous import'],
+    7:['Team Ledger','Every invoice your team has recorded in the shared cloud database'],
   };
   document.getElementById('pageTitle').textContent = titles[n][0];
   document.getElementById('pageSub').textContent = titles[n][1];
@@ -1012,7 +1013,183 @@ document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('btnSaveSessionTop').addEventListener('click', saveSessionFromTopBar);
   document.getElementById('btnAutoRestoreInfo').addEventListener('click', ()=> restoreAutoSave(true));
 
+  // ---- Cloud sync (optional; no-ops when unconfigured) ----
+  Cloud.onChange(renderCloudStatus);
+  Cloud.onLedger(receiveLedger);
+  document.getElementById('btnCloudAuth').addEventListener('click', ()=>{
+    const s = Cloud.state();
+    (s.signedIn ? Cloud.signOut() : Cloud.signIn())
+      .catch(e=> toast('Sign-in failed: '+e.message, true));
+  });
+  document.getElementById('btnPushCloud').addEventListener('click', handleCloudPush);
+  document.getElementById('ledgerFilter').addEventListener('input', renderLedger);
+  document.getElementById('ledgerScope').addEventListener('change', renderLedger);
+  Cloud.init();
+
   // silent restore of last working state on load
   restoreAutoSave(false);
   renderSessions();
 });
+
+
+/* ---------------------- Cloud: status, ledger, push ----------------------
+   All of this is inert when firebase-config.js still holds placeholders —
+   the app stays a fully working offline tool. */
+
+let __ledgerRows = [];
+
+function renderCloudStatus(s){
+  const pill = document.getElementById('cloudPill');
+  if(!pill) return;
+  const btn      = document.getElementById('btnCloudAuth');
+  const badge    = document.getElementById('ledgerBadge');
+  const setup    = document.getElementById('cloudSetup');
+  const controls = document.getElementById('ledgerControls');
+
+  if(!s.available){
+    pill.textContent = '☁ Off';
+    pill.className = 'cloud-pill';
+    pill.title = s.reason;
+    btn.style.display = 'none';
+    badge.textContent = 'Not connected';
+    badge.className = 'badge neutral';
+    controls.style.display = 'none';
+    setup.style.display = 'block';
+    setup.innerHTML = '<b>Cloud sync is switched off — ' + escHtml(s.reason) + '</b>' +
+      'The app works normally without it; invoices just stay on this device. ' +
+      'To turn on shared tracking, follow the setup steps at the top of ' +
+      '<code class="inline">firebase-config.js</code>, then reload this page.';
+    return;
+  }
+
+  setup.style.display = 'none';
+
+  if(!s.signedIn){
+    pill.textContent = '☁ Sign in';
+    pill.className = 'cloud-pill warn';
+    pill.title = 'Cloud sync is configured — sign in to use it';
+    btn.style.display = '';
+    btn.textContent = 'Sign in';
+    badge.textContent = 'Signed out';
+    badge.className = 'badge neutral';
+    controls.style.display = 'none';
+    return;
+  }
+
+  if(!s.allowed){
+    pill.textContent = '☁ No access';
+    pill.className = 'cloud-pill err';
+    pill.title = s.email + ' is not on the team allowlist';
+    btn.style.display = '';
+    btn.textContent = 'Sign out';
+    badge.textContent = 'Not authorised';
+    badge.className = 'badge bad';
+    controls.style.display = 'none';
+    setup.style.display = 'block';
+    setup.innerHTML = '<b>' + escHtml(s.email) + ' is not on the team allowlist.</b>' +
+      'Ask whoever owns the Firebase project to add this address to the allowlist in ' +
+      '<code class="inline">firestore.rules</code> and republish the rules.';
+    return;
+  }
+
+  pill.textContent = '☁ ' + escHtml(s.name);
+  pill.className = 'cloud-pill on';
+  pill.title = 'Signed in as ' + s.email;
+  btn.style.display = '';
+  btn.textContent = 'Sign out';
+  badge.textContent = 'Live';
+  badge.className = 'badge good';
+  controls.style.display = 'flex';
+}
+
+function receiveLedger(rows, err){
+  if(err){
+    document.getElementById('ledgerBadge').textContent = 'Read failed';
+    document.getElementById('ledgerBadge').className = 'badge bad';
+    const setup = document.getElementById('cloudSetup');
+    setup.style.display = 'block';
+    setup.innerHTML = '<b>Could not read the ledger.</b>' + escHtml(err.message || String(err)) +
+      '<br><br>This is usually the security rules: check that your email is in the allowlist in ' +
+      '<code class="inline">firestore.rules</code> and that the rules are published.';
+    __ledgerRows = [];
+  } else {
+    __ledgerRows = rows || [];
+  }
+  renderLedger();
+}
+
+function renderLedger(){
+  const list  = document.getElementById('ledgerList');
+  const empty = document.getElementById('emptyLedger');
+  const stats = document.getElementById('ledgerStats');
+  if(!list) return;
+
+  const q     = (document.getElementById('ledgerFilter').value || '').trim().toLowerCase();
+  const scope = document.getElementById('ledgerScope').value;
+  const me    = Cloud.state().email.toLowerCase();
+
+  const rows = __ledgerRows.filter(r=>{
+    if(scope === 'mine' && String(r.createdBy||'').toLowerCase() !== me) return false;
+    if(scope === 'overridden' && !r.targetOverridden) return false;
+    if(!q) return true;
+    return [r.invoiceReference, r.poNumber, r.supplierName, r.customer, r.createdBy, r.site]
+      .map(v=> String(v||'').toLowerCase()).some(v=> v.includes(q));
+  });
+
+  list.innerHTML = '';
+  if(!rows.length){
+    empty.style.display = 'block';
+    empty.innerHTML = '<div class="icon">☁</div>' +
+      (__ledgerRows.length ? 'No invoices match this filter.' : 'Nothing saved to the ledger yet.');
+    stats.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  stats.style.display = 'grid';
+
+  document.getElementById('ldCount').textContent    = rows.length;
+  document.getElementById('ldGross').textContent    = fmtNum(rows.reduce((s,r)=> s + (Number(r.totalGross)||0), 0));
+  document.getElementById('ldPeople').textContent   = new Set(rows.map(r=> r.createdBy)).size;
+  document.getElementById('ldOverride').textContent = rows.filter(r=> r.targetOverridden).length;
+
+  rows.forEach(r=>{
+    const when = r.updatedAt && r.updatedAt.toDate
+      ? r.updatedAt.toDate().toLocaleString() : '—';
+    const div = document.createElement('div');
+    div.className = 'ledger-row';
+    div.innerHTML = `
+      <div>
+        <div><span class="ref">${escHtml(r.invoiceReference)}</span>
+             <span class="badge neutral">PO ${escHtml(r.poNumber)}</span>
+             ${r.targetOverridden ? '<span class="badge gold">VAT→0%</span>' : ''}</div>
+        <div class="meta">${escHtml(r.supplierName||'—')} · ${r.lineItemCount||0} line(s) · by ${escHtml(r.createdBy)} · ${escHtml(when)}</div>
+      </div>
+      <div class="amt">
+        Net <b>${fmtNum(r.totalNet)}</b> · VAT <b>${fmtNum(r.totalVat)}</b> ·
+        Gross <b>${fmtNum(r.totalGross)}</b> ${escHtml(r.currency||'')}
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function handleCloudPush(){
+  if(!state.invoices.length){ toast('Build the invoices first (Step 3).', true); return; }
+  const s = Cloud.state();
+  if(!s.available){ toast(Cloud.reason(), true); return; }
+  if(!s.signedIn){ toast('Sign in before saving to the team ledger.', true); return; }
+
+  const btn = document.getElementById('btnPushCloud');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '☁ Saving…';
+
+  Cloud.push(state.invoices)
+    .then(res=>{
+      toast('Saved ' + res.saved + ' invoice(s) to the team ledger ✓');
+      document.getElementById('exportMsg').innerHTML =
+        '<span class="badge good">☁ ' + res.saved + ' invoice(s) recorded in the team ledger</span>';
+      goStep(7);
+    })
+    .catch(e=> toast('Cloud save failed: ' + e.message, true))
+    .then(()=>{ btn.disabled = false; btn.textContent = original; });
+}
