@@ -21,13 +21,17 @@
    ========================================================================= */
 
 window.FIREBASE_CONFIG = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyA3•••••••••••••••••••••••••••••••',
+  authDomain: 'mfc-invoice-system.firebaseapp.com',
+  projectId: 'mfc-invoice-system',
+  storageBucket: 'mfc-invoice-system.firebasestorage.app',
+  messagingSenderId: '1087245727585',
+  appId: '1:1087245727585:web:9d853f9606ae7fb14c7720',
 };
+
+window.ALLOWED_EMAILS = [
+  'haider.alsaadi83@gmail.com',
+];
 
 /* Shown in the UI so a rejected user gets a useful message instead of a raw
    permission error. The real enforcement is in firestore.rules — editing this
