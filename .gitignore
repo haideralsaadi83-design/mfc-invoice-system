@@ -12,3 +12,8 @@ Thumbs.db
 firebase-config.local.js
 .env
 .env.local
+.gstack/
+
+# Firebase CLI noise
+firebase-debug.log
+firestore-debug.log
