@@ -50,6 +50,27 @@ body{
 }
 ::selection{background:var(--cyan);color:white;}
 
+/* ---- Drag & drop + invoice toolbar ---- */
+.card.dragover{outline:2px dashed var(--cyan); outline-offset:5px; background:var(--ice);}
+.card.dragover textarea{border-color:var(--cyan);}
+.drop-hint{font-size:11.5px;color:var(--slate);margin-top:8px;}
+.inv-toolbar{
+  display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
+  margin-top:16px;padding:12px 14px;background:var(--ice);border-radius:var(--radius);
+}
+.inv-toolbar .grow{flex:1;min-width:200px;}
+.inv-toolbar label{
+  display:block;font-size:11px;font-weight:600;color:var(--slate);
+  margin-bottom:5px;letter-spacing:.3px;
+}
+.inv-toolbar input,.inv-toolbar select{
+  width:100%;padding:8px 10px;border:1px solid var(--slate-light);
+  border-radius:7px;font-family:var(--font-body);font-size:13px;background:white;
+}
+.inv-toolbar input:focus,.inv-toolbar select:focus{outline:none;border-color:var(--cyan);}
+.showing{font-size:11.5px;color:var(--slate);margin:10px 0 0;}
+.showing b{color:var(--navy);}
+
 /* ---- Cloud sync / ledger ---- */
 .cloud-box{display:flex;align-items:center;gap:8px;}
 .cloud-pill{
@@ -374,6 +395,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
           <button class="btn-primary" id="btnParseDump">Analyze Data →</button>
           <button class="btn-ghost" id="btnClearDump">Clear</button>
         </div>
+        <div class="drop-hint">📎 You can also drag an Excel or CSV file anywhere onto this card.</div>
         <div id="dumpStats" class="stat-grid" style="display:none;margin-top:16px;">
           <div class="stat"><div class="n" id="stRows">0</div><div class="l">Total rows imported</div></div>
           <div class="stat"><div class="n" id="stAvail">0</div><div class="l">Line items available to invoice</div></div>
@@ -398,6 +420,7 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
           <button class="btn-primary" id="btnParseMap">Analyze Table →</button>
           <button class="btn-ghost" id="btnClearMap">Clear</button>
         </div>
+        <div class="drop-hint">📎 You can also drag an Excel or CSV file anywhere onto this card.</div>
         <div id="mapStats" class="stat-grid" style="display:none;margin-top:16px;">
           <div class="stat"><div class="n" id="stMapRows">0</div><div class="l">Invoice numbers imported</div></div>
           <div class="stat"><div class="n" id="stMapMatched">0</div><div class="l">Matched with imported PO's</div></div>
@@ -461,7 +484,33 @@ code.inline{background:var(--ice);padding:1px 6px;border-radius:5px;font-family:
         </div>
         <div id="unmatchedWarning"></div>
         <div id="overrideWarning"></div>
-        <div id="invoiceList" style="margin-top:18px;"></div>
+        <div class="inv-toolbar" id="invToolbar" style="display:none;">
+          <div class="grow">
+            <label>Search</label>
+            <input type="text" id="invFilter" placeholder="PO number, invoice number, supplier or customer…">
+          </div>
+          <div>
+            <label>Sort by</label>
+            <select id="invSort">
+              <option value="default">Original order</option>
+              <option value="po">PO number</option>
+              <option value="ref">Invoice number</option>
+              <option value="gross-desc">Gross (high to low)</option>
+              <option value="gross-asc">Gross (low to high)</option>
+              <option value="override">Overridden first</option>
+            </select>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn-secondary" id="btnExpandAll">Expand all</button>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn-ghost" id="btnCollapseAll">Collapse all</button>
+          </div>
+        </div>
+        <p class="showing" id="invShowing" style="display:none;"></p>
+        <div id="invoiceList" style="margin-top:12px;"></div>
         <div class="empty-state" id="emptyInvoices" style="display:none;">
           <div class="icon">📄</div>
           No invoices yet — complete Step 1 &amp; 2, then click "Build &amp; Preview Invoices".

@@ -100,12 +100,25 @@ app.js              parsing, invoice building, Excel export, persistence
 cloud.js            optional Firebase layer (auth, writes, live ledger)
 firebase-config.js  your Firebase project config — edit this
 firestore.rules     security rules — paste into the Firebase console
+test.js             dependency-free self-check (node test.js)
 vendor/
   xlsx.full.min.js  SheetJS, reads uploaded workbooks
   exceljs.min.js    ExcelJS, writes the styled export
 ```
 
 SheetJS and ExcelJS are vendored rather than loaded from a CDN so the tool keeps working behind restrictive corporate firewalls. Firebase is loaded from Google's CDN instead, since cloud sync needs the network regardless.
+
+---
+
+## Tests
+
+```bash
+node test.js
+```
+
+No framework and no dependencies. It loads the real `app.js` into a stubbed DOM and exercises the shipped functions rather than re-implementing the formulas — a test that reimplements the logic only proves the copy works.
+
+Covers the VAT calculation, both sides of the target-amount override, and the Step 4 filter/sort, including the guarantee that filtering never changes what gets exported.
 
 ---
 

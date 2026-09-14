@@ -33,6 +33,10 @@ let state = {
   invoices: [],        // built invoice objects
 };
 
+/* View-only state for the Step 4 list. Deliberately separate from `state`:
+   filtering and sorting must never influence what gets built or exported. */
+let invView = { q:'', sort:'default' };
+
 /* ---------------------- Utilities ---------------------- */
 function toast(msg, isError){
   const t = document.getElementById('toast');
@@ -556,12 +560,32 @@ function renderInvoices(){
   document.getElementById('invBadge').textContent = state.invoices.length + ' invoices';
   document.getElementById('invBadge').className = 'badge good';
 
+  // Totals always cover EVERY invoice, never the filtered view. A filtered
+  // subtotal misread as the batch total is how a wrong invoice ships.
   let sumLines=0, sumNet=0, sumVat=0, sumGross=0;
-
-  state.invoices.forEach((inv, idx)=>{
+  state.invoices.forEach(inv=>{
     sumLines += inv.lineItems.length;
     sumNet += inv.totalNet; sumVat += inv.totalVat; sumGross += inv.totalGross;
+  });
 
+  const view = invoiceView();
+  document.getElementById('invToolbar').style.display =
+    state.invoices.length > 1 ? 'flex' : 'none';
+
+  const showing = document.getElementById('invShowing');
+  if(view.length !== state.invoices.length){
+    showing.style.display = 'block';
+    showing.innerHTML = 'Showing <b>' + view.length + '</b> of <b>' +
+      state.invoices.length + '</b> invoices — the totals above still cover all ' +
+      state.invoices.length + '.';
+  } else {
+    showing.style.display = 'none';
+  }
+  if(!view.length){
+    list.innerHTML = '<div class="empty-state"><div class="icon">🔍</div>No invoices match this search.</div>';
+  }
+
+  view.forEach((inv, idx)=>{
     const div = document.createElement('div');
     div.className = 'invoice';
     div.innerHTML = `
@@ -1013,6 +1037,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('btnSaveSessionTop').addEventListener('click', saveSessionFromTopBar);
   document.getElementById('btnAutoRestoreInfo').addEventListener('click', ()=> restoreAutoSave(true));
 
+  // ---- Step 4 toolbar ----
+  document.getElementById('invFilter').addEventListener('input', function(){
+    invView.q = this.value; renderInvoices();
+  });
+  document.getElementById('invSort').addEventListener('change', function(){
+    invView.sort = this.value; renderInvoices();
+  });
+  document.getElementById('btnExpandAll').addEventListener('click', ()=>
+    document.querySelectorAll('#invoiceList .invoice').forEach(n=> n.classList.add('open')));
+  document.getElementById('btnCollapseAll').addEventListener('click', ()=>
+    document.querySelectorAll('#invoiceList .invoice').forEach(n=> n.classList.remove('open')));
+
+  // ---- Drag & drop onto the two import cards ----
+  wireDrop(document.querySelector('#sec1 .card'), document.getElementById('dumpFile'), handleDumpParse);
+  wireDrop(document.querySelector('#sec2 .card'), document.getElementById('mapFile'), handleMapParse);
+
   // ---- Cloud sync (optional; no-ops when unconfigured) ----
   Cloud.onChange(renderCloudStatus);
   Cloud.onLedger(receiveLedger);
@@ -1192,4 +1232,59 @@ function handleCloudPush(){
     })
     .catch(e=> toast('Cloud save failed: ' + e.message, true))
     .then(()=>{ btn.disabled = false; btn.textContent = original; });
+}
+
+
+/* ---------------------- Step 4 view helpers ----------------------
+   Filtering and sorting are presentation only. They never touch
+   state.invoices, so what gets exported is unaffected by what is on screen. */
+
+function invoiceView(){
+  const q = (invView.q || '').trim().toLowerCase();
+  let rows = state.invoices.filter(inv=>{
+    if(!q) return true;
+    return [inv.poDisplay, inv.invoiceReference, inv.supplierName, inv.customer, inv.site]
+      .map(v=> String(v||'').toLowerCase())
+      .some(v=> v.indexOf(q) !== -1);
+  });
+  const cmpText = (a,b)=> String(a).localeCompare(String(b), undefined, {numeric:true});
+  switch(invView.sort){
+    case 'po':         return rows.slice().sort((a,b)=> cmpText(a.poDisplay, b.poDisplay));
+    case 'ref':        return rows.slice().sort((a,b)=> cmpText(a.invoiceReference, b.invoiceReference));
+    case 'gross-desc': return rows.slice().sort((a,b)=> b.totalGross - a.totalGross);
+    case 'gross-asc':  return rows.slice().sort((a,b)=> a.totalGross - b.totalGross);
+    case 'override':   return rows.slice().sort((a,b)=> (b.targetOverridden?1:0) - (a.targetOverridden?1:0));
+    default:           return rows;
+  }
+}
+
+/* Makes a whole card a drop target for a spreadsheet. The dropped file is
+   assigned to the existing <input type="file"> so the normal parse path runs
+   unchanged — drag & drop is a second doorway, not a second pipeline. */
+function wireDrop(card, input, onFile){
+  if(!card || !input) return;
+  let depth = 0;
+  card.addEventListener('dragenter', e=>{
+    e.preventDefault(); depth++; card.classList.add('dragover');
+  });
+  card.addEventListener('dragover', e=>{ e.preventDefault(); });
+  card.addEventListener('dragleave', e=>{
+    e.preventDefault();
+    if(--depth <= 0){ depth = 0; card.classList.remove('dragover'); }
+  });
+  card.addEventListener('drop', e=>{
+    e.preventDefault();
+    depth = 0; card.classList.remove('dragover');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(!file) return;
+    try{
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    }catch(err){
+      toast('This browser blocked the dropped file — use the Choose File button.', true);
+      return;
+    }
+    onFile();
+  });
 }
